@@ -1,284 +1,1677 @@
-import Papa from 'papaparse';
-import { ClassData } from '@/types/schedule';
+<html lang="en" >
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Advanced OCR PDF Extractor with Multiple Views & Advanced Features</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.7.107/build/pdf.min.js"></script>
+  <style>
+    #fileElem {
+      display: none;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #fafafa;
+      color: #222;
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 1.5rem 1rem;
+      box-shadow: 0 1px 3px rgb(0 0 0 / 0.05);
+    }
+    header h1 {
+      font-weight: 700;
+      font-size: 1.75rem;
+      color: #111827;
+      text-align: center;
+    }
+    header p {
+      font-weight: 400;
+      font-size: 1rem;
+      color: #6b7280;
+      text-align: center;
+      margin-top: 0.25rem;
+    }
+    main {
+      max-width: 1100px;
+      margin: 2rem auto 4rem;
+      background: #fff;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 12px rgb(0 0 0 / 0.05);
+      padding: 1.5rem 2rem 2rem;
+      display: flex;
+      flex-direction: column;
+    }
+    label#drop-area {
+      border: 2px dashed #d1d5db;
+      border-radius: 0.5rem;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.3s ease, background-color 0.3s ease;
+      color: #6b7280;
+      user-select: none;
+    }
+    label#drop-area:hover {
+      border-color: #4b5563;
+      background-color: #f9fafb;
+      color: #374151;
+    }
+    label#drop-area i {
+      font-size: 4.5rem;
+      color: #9ca3af;
+      margin-bottom: 1rem;
+    }
+    label#drop-area p {
+      font-weight: 600;
+      font-size: 1.125rem;
+      margin-bottom: 0.25rem;
+    }
+    label#drop-area small {
+      font-weight: 400;
+      font-size: 0.875rem;
+      color: #9ca3af;
+    }
+    section#results {
+      margin-top: 2rem;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 700px;
+      border-radius: 0.5rem;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+    }
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #e5e7eb;
+      user-select: none;
+      flex-wrap: wrap;
+    }
+    .tab {
+      flex: 1 1 120px;
+      text-align: center;
+      padding: 0.75rem 0;
+      font-weight: 600;
+      font-size: 1rem;
+      color: #6b7280;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: color 0.3s ease, border-color 0.3s ease;
+      min-width: 100px;
+    }
+    .tab:hover {
+      color: #374151;
+    }
+    .tab.active {
+      color: #111827;
+      border-color: #2563eb;
+      font-weight: 700;
+    }
+    .tab-content {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 1rem 1.5rem;
+      font-size: 0.95rem;
+      color: #374151;
+      height: 100%;
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-family: 'Inter', sans-serif;
+    }
+    thead tr {
+      background: #f3f4f6;
+      color: #374151;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    thead th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+      background: #f3f4f6;
+      z-index: 5;
+      user-select:none;
+      cursor: pointer;
+    }
+    tbody tr {
+      border-bottom: 1px solid #e5e7eb;
+    }
+    tbody tr:hover {
+      background: #e0e7ff;
+    }
+    tbody td {
+      padding: 0.6rem 1rem;
+      color: #4b5563;
+    }
+    .day-header-row td {
+      background: #e0e7ff;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #1e40af;
+      padding: 0.75rem 1rem;
+      border-bottom: 2px solid #2563eb;
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      align-items: center;
+    }
+    .filters label {
+      font-weight: 600;
+      color: #2563eb;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    .filters select, .filters input[type="text"] {
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.9rem;
+      color: #374151;
+      min-width: 140px;
+      background: white;
+      cursor: pointer;
+      transition: border-color 0.3s ease;
+    }
+    .filters select:hover, .filters select:focus,
+    .filters input[type="text"]:hover, .filters input[type="text"]:focus {
+      border-color: #2563eb;
+      outline: none;
+    }
+    .info-list {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #374151;
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      padding: 0.75rem 1rem;
+      background: #f9fafb;
+    }
+    .info-list ul {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+    .info-list li {
+      padding: 0.25rem 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .info-list li:last-child {
+      border-bottom: none;
+    }
+    .modal-bg {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 50;
+    }
+    .modal-bg.active {
+      display: flex;
+    }
+    .modal {
+      background: white;
+      border-radius: 0.5rem;
+      max-width: 400px;
+      width: 90%;
+      padding: 1.5rem;
+      box-shadow: 0 10px 25px rgb(0 0 0 / 0.15);
+    }
+    .modal h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: #2563eb;
+    }
+    .modal label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-weight: 600;
+      color: #2563eb;
+    }
+    .modal input[type="text"] {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+      color: #374151;
+    }
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+    }
+    .modal-buttons button {
+      padding: 0.5rem 1rem;
+      font-weight: 600;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      border: none;
+      transition: background-color 0.3s ease;
+    }
+    .modal-buttons .btn-save {
+      background-color: #2563eb;
+      color: white;
+    }
+    .modal-buttons .btn-save:hover {
+      background-color: #1e40af;
+    }
+    .modal-buttons .btn-cancel {
+      background-color: #e0e7ff;
+      color: #2563eb;
+    }
+    .modal-buttons .btn-cancel:hover {
+      background-color: #c7d2fe;
+    }
+    pre.raw-text {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.85rem;
+      color: #374151;
+      max-height: 650px;
+      overflow-y: auto;
+      background: #f3f4f6;
+      border-radius: 0.375rem;
+      padding: 1rem;
+      border: 1px solid #d1d5db;
+    }
+    /* Kanban styles */
+    .kanban-board {
+      display: flex;
+      gap: 1rem;
+      overflow-x: auto;
+      padding-bottom: 1rem;
+      height: 100%;
+    }
+    .kanban-column {
+      background: #f9fafb;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      flex: 0 0 250px;
+      display: flex;
+      flex-direction: column;
+      max-height: 100%;
+    }
+    .kanban-column-header {
+      background: #2563eb;
+      color: white;
+      font-weight: 700;
+      padding: 0.75rem 1rem;
+      border-top-left-radius: 0.5rem;
+      border-top-right-radius: 0.5rem;
+      user-select:none;
+    }
+    .kanban-cards {
+      overflow-y: auto;
+      padding: 0.5rem 1rem;
+      flex-grow: 1;
+    }
+    .kanban-card {
+      background: white;
+      border-radius: 0.375rem;
+      box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.75rem;
+      cursor: grab;
+      user-select:none;
+      transition: box-shadow 0.2s ease;
+    }
+    .kanban-card:hover {
+      box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+    }
+    .kanban-card strong {
+      display: block;
+      margin-bottom: 0.25rem;
+      color: #2563eb;
+    }
+    /* Timeline styles */
+    .timeline-container {
+      overflow-x: auto;
+      height: 100%;
+      padding-bottom: 1rem;
+    }
+    .timeline {
+      display: flex;
+      gap: 1rem;
+      min-width: 900px;
+      border-left: 3px solid #2563eb;
+      position: relative;
+      padding-left: 1rem;
+      height: 100%;
+    }
+    .timeline-day {
+      flex: 1;
+      border-right: 1px solid #e5e7eb;
+      padding: 0 0.5rem;
+      position: relative;
+      min-width: 120px;
+    }
+    .timeline-day:last-child {
+      border-right: none;
+    }
+    .timeline-day-header {
+      font-weight: 700;
+      color: #2563eb;
+      margin-bottom: 0.5rem;
+      user-select:none;
+    }
+    .timeline-event {
+      background: #e0e7ff;
+      border-radius: 0.375rem;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+      cursor: default;
+      user-select:none;
+    }
+    /* Card view styles */
+    .card-view {
+      display: grid;
+      grid-template-columns: repeat(auto-fill,minmax(280px,1fr));
+      gap: 1rem;
+      height: 100%;
+      overflow-y: auto;
+      padding-bottom: 1rem;
+    }
+    .card {
+      background: white;
+      border-radius: 0.5rem;
+      box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      user-select:none;
+      transition: box-shadow 0.2s ease;
+    }
+    .card:hover {
+      box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+    }
+    .card h3 {
+      font-weight: 700;
+      color: #2563eb;
+      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+    }
+    .card p {
+      margin: 0.15rem 0;
+      color: #4b5563;
+      font-size: 0.95rem;
+    }
+    /* Pivot view styles */
+    .pivot-table-container {
+      overflow-x: auto;
+      height: 100%;
+    }
+    .pivot-table {
+      border-collapse: collapse;
+      width: 100%;
+      font-family: 'Inter', sans-serif;
+    }
+    .pivot-table th, .pivot-table td {
+      border: 1px solid #e5e7eb;
+      padding: 0.5rem 0.75rem;
+      text-align: center;
+      font-size: 0.9rem;
+      user-select:none;
+    }
+    .pivot-table th {
+      background: #2563eb;
+      color: white;
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    /* Time of day view styles */
+    .timeofday-container {
+      overflow-y: auto;
+      height: 100%;
+      padding-bottom: 1rem;
+    }
+    .timeofday-group {
+      margin-bottom: 1rem;
+    }
+    .timeofday-header {
+      font-weight: 700;
+      color: #2563eb;
+      margin-bottom: 0.5rem;
+      user-select:none;
+    }
+    .timeofday-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      background: #f9fafb;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .timeofday-list li {
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid #e5e7eb;
+      color: #374151;
+      font-size: 0.95rem;
+    }
+    .timeofday-list li:last-child {
+      border-bottom: none;
+    }
+    /* Scrollbar styling for all scrollable containers */
+    .kanban-cards::-webkit-scrollbar,
+    .timeline-container::-webkit-scrollbar,
+    .card-view::-webkit-scrollbar,
+    .pivot-table-container::-webkit-scrollbar,
+    .timeofday-list::-webkit-scrollbar,
+    .info-list::-webkit-scrollbar,
+    pre.raw-text::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    .kanban-cards::-webkit-scrollbar-thumb,
+    .timeline-container::-webkit-scrollbar-thumb,
+    .card-view::-webkit-scrollbar-thumb,
+    .pivot-table-container::-webkit-scrollbar-thumb,
+    .timeofday-list::-webkit-scrollbar-thumb,
+    .info-list::-webkit-scrollbar-thumb,
+    pre.raw-text::-webkit-scrollbar-thumb {
+      background-color: #2563eb;
+      border-radius: 4px;
+    }
+    /* Responsive */
+    @media (max-width: 640px) {
+      main {
+        padding: 1rem 1rem 1.5rem;
+      }
+      label#drop-area {
+        padding: 2rem 1rem;
+      }
+      .filters {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .filters label, .filters select, .filters input[type="text"] {
+        width: 100%;
+      }
+      .tabs {
+        justify-content: center;
+      }
+      .tab {
+        flex: 1 1 100px;
+        min-width: 80px;
+        font-size: 0.9rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Advanced OCR PDF Extractor with Multiple Views & Advanced Features</h1>
+    <p>Drag & drop your PDF files or click to upload. Extract text with advanced OCR and fuzzy matching. View data as Table, Kanban, Timeline, Cards, Pivot, or Time of Day.</p>
+  </header>
+  <main>
+    <label for="fileElem" id="drop-area" tabindex="0" role="button" aria-label="Upload PDF files">
+      <i class="fas fa-file-pdf"></i>
+      <p>Drag & Drop PDF files here or click to select</p>
+      <small>Supports multiple PDFs. Extracts text using advanced OCR and fuzzy matching for best accuracy.</small>
+      <input type="file" id="fileElem" accept="application/pdf" multiple aria-hidden="true" />
+    </label>
 
-// Days order for sorting and tabs
-const daysOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    <section id="results" aria-live="polite" aria-atomic="true" aria-relevant="additions removals">
+      <nav class="tabs" role="tablist" aria-label="Result tabs">
+        <button class="tab active" role="tab" aria-selected="true" aria-controls="tab-table" id="tab-btn-table" tabindex="0">Table View</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="tab-kanban" id="tab-btn-kanban" tabindex="-1">Kanban View</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="tab-timeline" id="tab-btn-timeline" tabindex="-1">Timeline View</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="tab-cards" id="tab-btn-cards" tabindex="-1">Card View</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="tab-pivot" id="tab-btn-pivot" tabindex="-1">Pivot View</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="tab-timeofday" id="tab-btn-timeofday" tabindex="-1">Time of Day View</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="tab-raw" id="tab-btn-raw" tabindex="-1">Raw OCR Text</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="tab-info" id="tab-btn-info" tabindex="-1">Info</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="tab-saved" id="tab-btn-saved" tabindex="-1">Saved Tables</button>
+      </nav>
 
-// Allowed trainer names for normalization
-const allowedNames = [
-  'Rohan', 'Anisha', 'Richard', 'Pranjali', 'Reshma', 'Atulan', 'Karanvir',
-  'Cauveri', 'Mrigakshi', 'Vivaran', 'Karan', 'Nishanth', 'Pushyank',
-  'Kajol', 'Siddhartha', 'Shruti K'
-];
+      <div id="tab-table" class="tab-content active" role="tabpanel" aria-labelledby="tab-btn-table" tabindex="0"></div>
+      <div id="tab-kanban" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-kanban" tabindex="0"></div>
+      <div id="tab-timeline" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-timeline" tabindex="0"></div>
+      <div id="tab-cards" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-cards" tabindex="0"></div>
+      <div id="tab-pivot" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-pivot" tabindex="0"></div>
+      <div id="tab-timeofday" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-timeofday" tabindex="0"></div>
+      <div id="tab-raw" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-raw" tabindex="0"></div>
+      <div id="tab-info" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-info" tabindex="0"></div>
+      <div id="tab-saved" class="tab-content" role="tabpanel" aria-labelledby="tab-btn-saved" tabindex="0"></div>
+    </section>
+  </main>
 
-// Class name mappings for normalization
-const classNameMappings: {[key: string]: string} = {
-  'Barre 57': 'Barre 57',
-  'Barre57': 'Barre 57',
-  'CYCLE': 'PowerCycle',
-  'Cardio Barre': 'Cardio Barre',
-  'FIT': 'Fit',
-  'MAT57': 'Mat 57',
-  "Trainer's Choice": "Trainer's Choice",
-  'Cardio Barre exp': 'Cardio Barre (Express)',
-  'Cardio B exp': 'Cardio Barre (Express)',
-  'Cardio B': 'Cardio Barre',
-  'CYCLE EXP': 'PowerCycle (Express)',
-  'Mat 57 exp': 'Mat 57 (Express)',
-  'Recovery': 'Recovery',
-  'BBB exp': 'Back Body Blaze (Express)',
-  'Foundations': 'Foundations',
-  'BBB': 'Back Body Blaze',
-  'Cardio Barre+': 'Cardio Barre Plus',
-  'PreNatal': 'Pre/Post Natal',
-  'Cardio B+': 'Cardio Barre Plus',
-  'HIIT': 'HIIT',
-  'Sakshi': '2',
-  'Taarika': '1',
-  'Sweat': 'Sweat in 30',
-  'Barre 57 exp': 'Barre 57 (Express)',
-  'Barre57 exp': 'Barre 57 (Express)',
-  'Amped Up': 'Amped Up!'
+  <!-- Modal for Save Table -->
+  <div id="saveModal" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">
+    <div class="modal">
+      <h3 id="modalTitle">Save Extracted Table</h3>
+      <label for="tableNameInput">Table Name</label>
+      <input type="text" id="tableNameInput" placeholder="Enter table name" aria-describedby="tableNameHelp" />
+      <div class="modal-buttons">
+        <button class="btn-save" id="saveTableBtn">Save</button>
+        <button class="btn-cancel" id="cancelSaveBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const fileElem = document.getElementById("fileElem");
+const dropArea = document.getElementById("drop-area");
+const resultsSection = document.getElementById("results");
+const tabs = resultsSection.querySelectorAll(".tab");
+const saveModal = document.getElementById("saveModal");
+const tableNameInput = document.getElementById("tableNameInput");
+const saveTableBtn = document.getElementById("saveTableBtn");
+const cancelSaveBtn = document.getElementById("cancelSaveBtn");
+
+let currentSchedule = [];
+let currentRawText = "";
+let filteredSchedule = [];
+let currentSort = { column: null, asc: true };
+let currentFilters = { day: "", className: "", trainer: "", searchText: "" };
+let currentGroupBy = null;
+let currentStyleSettings = {
+  table: {
+    headerBg: "#f3f4f6",
+    headerColor: "#374151",
+    rowHoverBg: "#e0e7ff",
+    borderColor: "#e5e7eb",
+  }
 };
 
-// Helper function to normalize class name
-export function normalizeClassName(raw: string): string {
-  if (!raw) return '';
-  let val = raw.trim();
-  val = val.replace(/\s+/g, ' ').toLowerCase();
-  
-  for (const [key, value] of Object.entries(classNameMappings)) {
-    if (val === key.toLowerCase()) {
-      return value;
+function switchTab(selectedTab) {
+  tabs.forEach(tab => {
+    const isSelected = tab === selectedTab;
+    tab.classList.toggle("active", isSelected);
+    tab.setAttribute("aria-selected", isSelected ? "true" : "false");
+    tab.setAttribute("tabindex", isSelected ? "0" : "-1");
+  });
+  const tabId = selectedTab.getAttribute("aria-controls");
+  resultsSection.querySelectorAll(".tab-content").forEach(tc => {
+    tc.classList.toggle("active", tc.id === tabId);
+  });
+  const activeContent = resultsSection.querySelector(".tab-content.active");
+  if (activeContent) activeContent.focus();
+  if (tabId === "tab-saved") {
+    renderSavedTables();
+  }
+  if (tabId === "tab-table") {
+    renderTableView();
+  }
+  if (tabId === "tab-kanban") {
+    renderKanbanView();
+  }
+  if (tabId === "tab-timeline") {
+    renderTimelineView();
+  }
+  if (tabId === "tab-cards") {
+    renderCardView();
+  }
+  if (tabId === "tab-pivot") {
+    renderPivotView();
+  }
+  if (tabId === "tab-timeofday") {
+    renderTimeOfDayView();
+  }
+}
+
+tabs.forEach(tab => {
+  tab.addEventListener("click", () => switchTab(tab));
+  tab.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      let idx = Array.from(tabs).indexOf(tab);
+      if (e.key === "ArrowRight") idx = (idx + 1) % tabs.length;
+      else idx = (idx - 1 + tabs.length) % tabs.length;
+      tabs[idx].focus();
+      switchTab(tabs[idx]);
     }
-  }
-  
-  return raw;
+  });
+});
+
+fileElem.addEventListener("change", handleFiles, false);
+dropArea.addEventListener("drop", handleDrop, false);
+dropArea.addEventListener("dragenter", e => e.preventDefault());
+dropArea.addEventListener("dragover", e => e.preventDefault());
+
+async function handleDrop(e) {
+  e.preventDefault();
+  const dt = e.dataTransfer;
+  const files = dt.files;
+  await processFiles(files);
+}
+async function handleFiles(e) {
+  const files = e.target.files;
+  await processFiles(files);
 }
 
-// Helper function to normalize trainer name
-export function normalizeTrainerName(raw: string): string {
-  if (!raw) return '';
-  
-  // Trim and normalize the input string
-  const val = raw.trim().toLowerCase();
+async function processFiles(files) {
+  clearAllViews();
+  currentSchedule = [];
+  currentRawText = "";
+  filteredSchedule = [];
+  if (!files.length) return;
 
-  // Specific replacements for trainer names
-  if (val === 'mriga') return 'Mrigakshi';
-  if (val === 'nishant') return 'Nishanth';
-
-  // Check for exact matches in the allowed names
-  for (const name of allowedNames) {
-    if (val === name.toLowerCase()) return name;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (file.type !== "application/pdf") {
+      alert(`File "${file.name}" is not a PDF.`);
+      continue;
+    }
+    // Show loading in raw tab
+    const rawTab = document.getElementById("tab-raw");
+    rawTab.textContent = "Processing PDF and extracting text, please wait...";
+    // Extract text from all pages (text + OCR fallback)
+    const extractedText = await extractTextFromPDF(file);
+    currentRawText += `--- File: ${file.name} ---\n\n` + extractedText + "\n\n";
   }
+  const rawTab = document.getElementById("tab-raw");
+  rawTab.textContent = currentRawText.trim();
 
-  // Check for partial matches in the allowed names
-  for (const name of allowedNames) {
-    if (val.includes(name.toLowerCase())) return name;
-  }
+  // Parse schedule from combined text
+  currentSchedule = parseScheduleFromText(currentRawText);
+  filteredSchedule = currentSchedule.slice();
 
-  // Return the original value if no matches are found
-  return raw.trim();
+  // Reset filters and sorting
+  currentFilters = { day: "", className: "", trainer: "", searchText: "" };
+  currentSort = { column: null, asc: true };
+  currentGroupBy = null;
+
+  renderTableView();
+  switchTab(tabs[0]);
 }
 
-// Helper function to parse time string to Date
-export function parseTimeToDate(timeStr: string): Date | null {
-  if (!timeStr) return null;
-
-  const today = new Date();
-  let time = timeStr.trim().toUpperCase();
-
-  // Replace fullstops with colons in time strings
-  time = time.replace(/\./g, ':');
-
-  // Try to match time in format "HH:MM AM/PM"
-  const ampmMatch = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-  if (ampmMatch) {
-    let hour = parseInt(ampmMatch[1], 10);
-    const minute = parseInt(ampmMatch[2], 10);
-    const ampm = ampmMatch[3].toUpperCase();
-
-    if (ampm === 'PM' && hour !== 12) hour += 12;
-    if (ampm === 'AM' && hour === 12) hour = 0;
-
-    return new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, minute);
-  }
-
-  // Try to match time in format "HH:MM"
-  const hmMatch = time.match(/^(\d{1,2}):(\d{2})$/);
-  if (hmMatch) {
-    const hour = parseInt(hmMatch[1], 10);
-    const minute = parseInt(hmMatch[2], 10);
-    return new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, minute);
-  }
-
-  // Try to match time in format "HH"
-  const hMatch = time.match(/^(\d{1,2})$/);
-  if (hMatch) {
-    const hour = parseInt(hMatch[1], 10);
-    return new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, 0);
-  }
-
-  return null;
-}
-// Helper function to format Date to time string
-export function formatTime(date: Date | null): string {
-  if (!date) return '';
-  
-  let hours = date.getHours();
-  const minutes = date.getMinutes();
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  
-  hours = hours % 12;
-  hours = hours ? hours : 12;
-  const minStr = minutes < 10 ? '0' + minutes : minutes;
-  
-  return `${hours}:${minStr} ${ampm}`;
-}
-
-// Main function to extract schedule data from CSV text
-export async function extractScheduleData(csvText: string): Promise<{[day: string]: ClassData[]}> {
-  return new Promise((resolve, reject) => {
-    Papa.parse(csvText, {
-      skipEmptyLines: true,
-      complete: (results) => {
-        try {
-          const rows = results.data as string[][];
-          
-          if (rows.length < 5) {
-            throw new Error('CSV does not have enough rows (minimum 5 required)');
-          }
-          
-          const dayRow = rows[2];
-          const headerRow = rows[3];
-          const dataRows = rows.slice(4);
-          
-          // Define column indices for each piece of data
-          const locationCols = [1, 7, 13, 18, 23, 28, 34];
-          const dayCols = locationCols;
-          const classCols = [2, 8, 14, 19, 24, 29, 35];
-          const trainer1Cols = [3, 9, 15, 20, 25, 30, 36];
-          const coverCols = [6, 12, 17, 22, 27, 32, 38];
-          
-          // Improved time column detection - check with case insensitivity
-          let timeColIndex = -1;
-          for (let i = 0; i < headerRow.length; i++) {
-            const header = headerRow[i]?.trim()?.toLowerCase() || '';
-            if (header === 'time') {
-              timeColIndex = i;
-              break;
-            }
-          }
-          
-          console.log("Header row:", headerRow);
-          console.log("Time column index found:", timeColIndex);
-          
-          if (timeColIndex === -1) {
-            throw new Error('Time column header not found in row 4. Available headers: ' + headerRow.filter(Boolean).join(', '));
-          }
-          
-          // Extract classes from rows
-          const classes: ClassData[] = [];
-          
-          for (const row of dataRows) {
-            for (let setIdx = 0; setIdx < locationCols.length; setIdx++) {
-              const locCol = locationCols[setIdx];
-              const dayCol = dayCols[setIdx];
-              const classCol = classCols[setIdx];
-              const trainer1Col = trainer1Cols[setIdx];
-              const coverCol = coverCols[setIdx];
-              
-              const location = row[locCol]?.trim() || '';
-              if (!location) continue;
-              
-              const dayRaw = dayRow[dayCol]?.trim() || 'Unknown';
-              const day = daysOrder.find(d => d.toLowerCase() === dayRaw.toLowerCase()) || dayRaw;
-              
-              let classNameRaw = row[classCol]?.trim() || '';
-              let className = normalizeClassName(classNameRaw);
-              if (!className) continue;
-              
-              let trainer1Raw = row[trainer1Col]?.trim() || '';
-              let coverRaw = row[coverCol]?.trim() || '';
-              let trainer1 = normalizeTrainerName(trainer1Raw);
-              let notes = '';
-              
-              if (coverRaw) {
-                const coverNorm = normalizeTrainerName(coverRaw);
-                notes = `Cover (${coverNorm}) replaces Trainer 1 (${trainer1})`;
-                trainer1 = coverNorm;
-              }
-              
-              const timeRaw = row[timeColIndex]?.trim() || '';
-              const timeDate = parseTimeToDate(timeRaw);
-              const time = timeDate ? formatTime(timeDate) : timeRaw;
-              
-              const uniqueKey = (
-                day + time + className + trainer1 + location
-              ).toLowerCase().replace(/\s+/g, '');
-              
-              classes.push({
-                day,
-                timeRaw,
-                timeDate,
-                time,
-                location,
-                className,
-                trainer1,
-                cover: coverRaw,
-                notes,
-                uniqueKey,
-              });
-            }
-          }
-          
-          // Group classes by day
-          const classesByDay: {[day: string]: ClassData[]} = {};
-          
-          for (const cls of classes) {
-            if (!classesByDay[cls.day]) classesByDay[cls.day] = [];
-            classesByDay[cls.day].push(cls);
-          }
-          
-          // Sort classes by time within each day
-          const sortedClassesByDay: {[day: string]: ClassData[]} = {};
-          
-          daysOrder.forEach(day => {
-            if (classesByDay[day]) {
-              classesByDay[day].sort((a, b) => {
-                if (a.timeDate && b.timeDate) return a.timeDate.getTime() - b.timeDate.getTime();
-                if (a.timeDate) return -1;
-                if (b.timeDate) return 1;
-                return 0;
-              });
-              
-              sortedClassesByDay[day] = classesByDay[day];
-            }
-          });
-          
-          // Add any days not in standard order
-          Object.keys(classesByDay)
-            .filter(d => !daysOrder.includes(d))
-            .sort()
-            .forEach(day => {
-              classesByDay[day].sort((a, b) => {
-                if (a.timeDate && b.timeDate) return a.timeDate.getTime() - b.timeDate.getTime();
-                if (a.timeDate) return -1;
-                if (b.timeDate) return 1;
-                return 0;
-              });
-              
-              sortedClassesByDay[day] = classesByDay[day];
-            });
-          
-          resolve(sortedClassesByDay);
-        } catch (err) {
-          reject(err);
-        }
-      },
-      error: (err) => {
-        reject(new Error('Error parsing CSV file: ' + err.message));
-      },
-    });
+function clearAllViews() {
+  ["tab-table","tab-kanban","tab-timeline","tab-cards","tab-pivot","tab-timeofday","tab-info","tab-saved"].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = "";
   });
 }
+
+async function extractTextFromPDF(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+  let fullText = "";
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items.map(item => item.str).join(" ");
+    if (pageText.trim().length >= 20) {
+      fullText += pageText + "\n\n";
+    } else {
+      // Fallback OCR for sparse text pages
+      const ocrText = await ocrPage(page);
+      fullText += ocrText + "\n\n";
+    }
+  }
+  if (!fullText.trim()) {
+    // Fallback OCR on all pages if no text extracted
+    fullText = "";
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const ocrText = await ocrPage(page);
+      fullText += ocrText + "\n\n";
+    }
+  }
+  return fullText.trim();
+}
+
+async function ocrPage(page) {
+  const viewport = page.getViewport({ scale: 2 });
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: context, viewport: viewport }).promise;
+  const { data: { text } } = await Tesseract.recognize(
+    canvas,
+    "eng",
+    {
+      logger: m => {},
+      tessedit_ocr_engine_mode: Tesseract.OEM.DEFAULT,
+      tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+    }
+  );
+  return text;
+}
+
+const knownClassesList = [
+  "Barre 57",
+  "Cardio Barre",
+  "Cardio Barre Plus",
+  "Cardio Barre (Express)",
+  "Foundations",
+  "Mat 57",
+  "Mat 57 (Express)",
+  "Fit",
+  "Back Body Blaze",
+  "Back Body Blaze (Express)",
+  "Sweat in 30",
+  "Recovery",
+  "Pre/Post Natal",
+  "HIIT",
+  "Amped Up!",
+  "Trainer's Choice",
+  "PowerCycle",
+  "PowerCycle (Express)"
+];
+
+function normalizeTime(rawTime) {
+  let t = rawTime.replace(/(\d{1,2})\.(\d{2})/g, '$1:$2').trim().toUpperCase();
+  if (!t.match(/\d{1,2}:\d{2}/)) {
+    t = t.replace(/(\d{1,2})(\s?[AP]M)/, '$1:00$2');
+  }
+  return t;
+}
+
+function timeToMinutes(t) {
+  const m = t.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
+  if (!m) return 0;
+  let hour = parseInt(m[1], 10);
+  const minute = parseInt(m[2], 10);
+  const ampm = m[3].toUpperCase();
+  if (ampm === "PM" && hour !== 12) hour += 12;
+  if (ampm === "AM" && hour === 12) hour = 0;
+  return hour * 60 + minute;
+}
+
+function matchClassName(text) {
+  const fuse = new Fuse(knownClassesList, {
+    includeScore: true,
+    threshold: 0.4,
+    ignoreLocation: true,
+    distance: 100,
+  });
+  const cleaned = text.replace(/[\s\-_.]+/g, " ").trim();
+  const result = fuse.search(cleaned);
+  if (result.length > 0) {
+    return result[0].item;
+  }
+  return text.trim();
+}
+
+function parseScheduleFromText(fullText) {
+  const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const dayRegex = new RegExp(`\\b(${daysOfWeek.join("|")})\\b`, "gi");
+
+  const startIndex = fullText.search(/\bMonday\b/i);
+  if (startIndex === -1) return [];
+
+  const text = fullText.slice(startIndex);
+
+  const daySplitRegex = new RegExp(`\\b(${daysOfWeek.join("|")})\\b`, "gi");
+  let dayBlocks = [];
+  let lastIndex = 0;
+  let match;
+  while ((match = daySplitRegex.exec(text)) !== null) {
+    if (match.index !== lastIndex) {
+      dayBlocks.push({
+        day: text.substring(lastIndex, match.index).trim(),
+        dayName: null
+      });
+    }
+    dayBlocks.push({
+      day: null,
+      dayName: match[0]
+    });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    dayBlocks.push({
+      day: text.substring(lastIndex).trim(),
+      dayName: null
+    });
+  }
+
+  let daysData = [];
+  let currentDay = null;
+  for (let i = 0; i < dayBlocks.length; i++) {
+    if (dayBlocks[i].dayName) {
+      currentDay = dayBlocks[i].dayName;
+      daysData.push({ day: currentDay, content: "" });
+    } else if (currentDay) {
+      daysData[daysData.length - 1].content += dayBlocks[i].day + " ";
+    }
+  }
+
+  const schedule = [];
+
+  daysData.forEach(({day, content}) => {
+    let cleanContent = content.replace(/\s+/g, " ").trim();
+
+    cleanContent = cleanContent.replace(/7 YEARS STRONG/gi, "");
+    cleanContent = cleanContent.replace(/BEAT THE TRAINER/gi, "");
+    cleanContent = cleanContent.replace(/SLOGAN.*?(\.|$)/gi, "");
+    cleanContent = cleanContent.trim();
+
+    const classTrainerRegex = /([A-Za-z0-9\s\(\)\'\!\+\/\-]+?)\s*-\s*([A-Za-z]+)/g;
+    let classTrainerMatches = [];
+    let m;
+    while ((m = classTrainerRegex.exec(cleanContent)) !== null) {
+      classTrainerMatches.push({
+        classRaw: m[1].trim(),
+        trainerRaw: m[2].trim()
+      });
+    }
+
+    let contentWithoutClasses = cleanContent;
+    classTrainerMatches.forEach(({classRaw, trainerRaw}) => {
+      const escapedClass = classRaw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const escapedTrainer = trainerRaw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const pattern = new RegExp(`${escapedClass}\\s*-\\s*${escapedTrainer}`, "gi");
+      contentWithoutClasses = contentWithoutClasses.replace(pattern, "");
+    });
+    contentWithoutClasses = contentWithoutClasses.trim();
+
+    const timeRegex = /(\d{1,2}[:.]?\d{0,2}\s?(AM|PM))/gi;
+    let timeMatches = [];
+    while ((m = timeRegex.exec(contentWithoutClasses)) !== null) {
+      timeMatches.push(normalizeTime(m[1]));
+    }
+
+    const count = Math.min(classTrainerMatches.length, timeMatches.length);
+    for (let i = 0; i < count; i++) {
+      const className = matchClassName(classTrainerMatches[i].classRaw);
+      const trainerName = classTrainerMatches[i].trainerRaw.replace(/\s{2,}/g, " ").trim();
+      const time = timeMatches[i];
+      schedule.push({
+        day,
+        time,
+        className,
+        trainer: trainerName
+      });
+    }
+  });
+
+  return schedule;
+}
+
+function groupAndSortSchedule(schedule, groupBy = null, sortColumn = null, asc = true) {
+  const dayOrder = {
+    Monday: 1,
+    Tuesday: 2,
+    Wednesday: 3,
+    Thursday: 4,
+    Friday: 5,
+    Saturday: 6,
+    Sunday: 7
+  };
+  let grouped = {};
+  if (groupBy && ["day", "className", "trainer"].includes(groupBy)) {
+    schedule.forEach(entry => {
+      const key = entry[groupBy] || "Unknown";
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(entry);
+    });
+    Object.keys(grouped).forEach(key => {
+      grouped[key].sort((a,b) => {
+        if (!sortColumn) return 0;
+        let valA = a[sortColumn];
+        let valB = b[sortColumn];
+        if (sortColumn === "time") {
+          return asc ? timeToMinutes(valA) - timeToMinutes(valB) : timeToMinutes(valB) - timeToMinutes(valA);
+        }
+        if (typeof valA === "string") valA = valA.toLowerCase();
+        if (typeof valB === "string") valB = valB.toLowerCase();
+        if (valA < valB) return asc ? -1 : 1;
+        if (valA > valB) return asc ? 1 : -1;
+        return 0;
+      });
+    });
+  } else {
+    grouped = { All: schedule.slice() };
+    if (sortColumn) {
+      grouped.All.sort((a,b) => {
+        let valA = a[sortColumn];
+        let valB = b[sortColumn];
+        if (sortColumn === "time") {
+          return asc ? timeToMinutes(valA) - timeToMinutes(valB) : timeToMinutes(valB) - timeToMinutes(valA);
+        }
+        if (typeof valA === "string") valA = valA.toLowerCase();
+        if (typeof valB === "string") valB = valB.toLowerCase();
+        if (valA < valB) return asc ? -1 : 1;
+        if (valA > valB) return asc ? 1 : -1;
+        return 0;
+      });
+    }
+  }
+  // Sort group keys if grouping by day
+  let sortedKeys = Object.keys(grouped);
+  if (groupBy === "day") {
+    sortedKeys.sort((a,b) => (dayOrder[a] || 100) - (dayOrder[b] || 100));
+  } else {
+    sortedKeys.sort();
+  }
+  return { grouped, sortedKeys };
+}
+
+function applyFiltersAndSearch() {
+  let filtered = currentSchedule.filter(entry => {
+    const dayMatch = !currentFilters.day || entry.day === currentFilters.day;
+    const classMatch = !currentFilters.className || entry.className === currentFilters.className;
+    const trainerMatch = !currentFilters.trainer || entry.trainer === currentFilters.trainer;
+    const searchText = currentFilters.searchText.toLowerCase();
+    const searchMatch = !searchText || (
+      entry.day.toLowerCase().includes(searchText) ||
+      entry.className.toLowerCase().includes(searchText) ||
+      entry.trainer.toLowerCase().includes(searchText) ||
+      entry.time.toLowerCase().includes(searchText)
+    );
+    return dayMatch && classMatch && trainerMatch && searchMatch;
+  });
+  filteredSchedule = filtered;
+}
+
+function renderTableView() {
+  const container = document.getElementById("tab-table");
+  container.innerHTML = "";
+
+  if (!currentSchedule.length) {
+    container.innerHTML = "<p class='text-gray-500 text-center mt-6'>No valid schedule found.</p>";
+    return;
+  }
+
+  // Controls container
+  const controlsDiv = document.createElement("div");
+  controlsDiv.className = "filters flex-wrap justify-between mb-4";
+
+  // Filters container
+  const filterDiv = document.createElement("div");
+  filterDiv.className = "filters flex-wrap gap-2";
+
+  // Day filter
+  const dayLabel = document.createElement("label");
+  dayLabel.setAttribute("for", "filterDay");
+  dayLabel.textContent = "Filter by Day:";
+  filterDiv.appendChild(dayLabel);
+  const daySelect = document.createElement("select");
+  daySelect.id = "filterDay";
+  daySelect.setAttribute("aria-label", "Filter by Day");
+  const days = [...new Set(currentSchedule.map(s => s.day))].sort((a,b) => {
+    const dayOrder = {Monday:1,Tuesday:2,Wednesday:3,Thursday:4,Friday:5,Saturday:6,Sunday:7};
+    return (dayOrder[a]||100) - (dayOrder[b]||100);
+  });
+  daySelect.innerHTML = `<option value="">All Days</option>` + days.map(d => `<option value="${d}">${d}</option>`).join("");
+  filterDiv.appendChild(daySelect);
+
+  // Class filter
+  const classLabel = document.createElement("label");
+  classLabel.setAttribute("for", "filterClass");
+  classLabel.textContent = "Filter by Class:";
+  filterDiv.appendChild(classLabel);
+  const classSelect = document.createElement("select");
+  classSelect.id = "filterClass";
+  classSelect.setAttribute("aria-label", "Filter by Class");
+  const classes = [...new Set(currentSchedule.map(s => s.className))].sort();
+  classSelect.innerHTML = `<option value="">All Classes</option>` + classes.map(c => `<option value="${c}">${c}</option>`).join("");
+  filterDiv.appendChild(classSelect);
+
+  // Trainer filter
+  const trainerLabel = document.createElement("label");
+  trainerLabel.setAttribute("for", "filterTrainer");
+  trainerLabel.textContent = "Filter by Trainer:";
+  filterDiv.appendChild(trainerLabel);
+  const trainerSelect = document.createElement("select");
+  trainerSelect.id = "filterTrainer";
+  trainerSelect.setAttribute("aria-label", "Filter by Trainer");
+  const trainers = [...new Set(currentSchedule.map(s => s.trainer))].sort();
+  trainerSelect.innerHTML = `<option value="">All Trainers</option>` + trainers.map(t => `<option value="${t}">${t}</option>`).join("");
+  filterDiv.appendChild(trainerSelect);
+
+  // Search box
+  const searchLabel = document.createElement("label");
+  searchLabel.setAttribute("for", "searchText");
+  searchLabel.textContent = "Search:";
+  filterDiv.appendChild(searchLabel);
+  const searchInput = document.createElement("input");
+  searchInput.type = "text";
+  searchInput.id = "searchText";
+  searchInput.placeholder = "Search all fields";
+  searchInput.setAttribute("aria-label", "Search all fields");
+  filterDiv.appendChild(searchInput);
+
+  controlsDiv.appendChild(filterDiv);
+
+  // Group by select
+  const groupDiv = document.createElement("div");
+  groupDiv.className = "filters flex-wrap gap-2 items-center";
+
+  const groupLabel = document.createElement("label");
+  groupLabel.setAttribute("for", "groupBySelect");
+  groupLabel.textContent = "Group by:";
+  groupDiv.appendChild(groupLabel);
+
+  const groupSelect = document.createElement("select");
+  groupSelect.id = "groupBySelect";
+  groupSelect.setAttribute("aria-label", "Group by");
+  groupSelect.innerHTML = `
+    <option value="">None</option>
+    <option value="day">Day</option>
+    <option value="className">Class Name</option>
+    <option value="trainer">Trainer</option>
+  `;
+  groupDiv.appendChild(groupSelect);
+
+  // Sort by select
+  const sortLabel = document.createElement("label");
+  sortLabel.setAttribute("for", "sortBySelect");
+  sortLabel.textContent = "Sort by:";
+  groupDiv.appendChild(sortLabel);
+
+  const sortSelect = document.createElement("select");
+  sortSelect.id = "sortBySelect";
+  sortSelect.setAttribute("aria-label", "Sort by");
+  sortSelect.innerHTML = `
+    <option value="">None</option>
+    <option value="day">Day</option>
+    <option value="time">Time</option>
+    <option value="className">Class Name</option>
+    <option value="trainer">Trainer</option>
+  `;
+  groupDiv.appendChild(sortSelect);
+
+  // Sort direction toggle
+  const sortDirBtn = document.createElement("button");
+  sortDirBtn.type = "button";
+  sortDirBtn.className = "btn-info px-3 py-1 rounded text-white font-semibold bg-blue-600 hover:bg-blue-700";
+  sortDirBtn.textContent = "Asc";
+  sortDirBtn.setAttribute("aria-label", "Toggle sort direction");
+  groupDiv.appendChild(sortDirBtn);
+
+  controlsDiv.appendChild(groupDiv);
+
+  // Buttons container
+  const btnsDiv = document.createElement("div");
+  btnsDiv.className = "filters flex-wrap gap-2 items-center";
+
+  // Show class counts button
+  const classCountBtn = document.createElement("button");
+  classCountBtn.className = "btn-info px-3 py-1 rounded text-white font-semibold bg-blue-600 hover:bg-blue-700";
+  classCountBtn.textContent = "Show Class Type Counts";
+  btnsDiv.appendChild(classCountBtn);
+
+  // Show trainer counts button
+  const trainerCountBtn = document.createElement("button");
+  trainerCountBtn.className = "btn-info px-3 py-1 rounded text-white font-semibold bg-blue-600 hover:bg-blue-700";
+  trainerCountBtn.textContent = "Show Trainer Counts";
+  btnsDiv.appendChild(trainerCountBtn);
+
+  // Copy to clipboard button
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "btn-info px-3 py-1 rounded text-white font-semibold bg-blue-600 hover:bg-blue-700";
+  copyBtn.innerHTML = `<i class="fas fa-copy"></i> Copy Table to Clipboard`;
+  btnsDiv.appendChild(copyBtn);
+
+  // Download CSV button
+  const downloadBtn = document.createElement("button");
+  downloadBtn.className = "btn-info px-3 py-1 rounded text-white font-semibold bg-blue-600 hover:bg-blue-700";
+  downloadBtn.innerHTML = `<i class="fas fa-file-csv"></i> Download CSV`;
+  btnsDiv.appendChild(downloadBtn);
+
+  // Save table button
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "btn-info px-3 py-1 rounded text-white font-semibold bg-blue-600 hover:bg-blue-700";
+  saveBtn.innerHTML = `<i class="fas fa-save"></i> Save Table`;
+  btnsDiv.appendChild(saveBtn);
+
+  controlsDiv.appendChild(btnsDiv);
+
+  container.appendChild(controlsDiv);
+
+  // Info display container
+  const infoDisplay = document.createElement("div");
+  infoDisplay.className = "info-list";
+  infoDisplay.style.display = "none";
+  container.appendChild(infoDisplay);
+
+  // Table container with horizontal scroll
+  const tableContainer = document.createElement("div");
+  tableContainer.className = "table-container overflow-x-auto";
+
+  // Create table element
+  const table = document.createElement("table");
+  table.id = "scheduleTable";
+  table.setAttribute("aria-label", "Extracted Schedule Table");
+  table.style.borderColor = currentStyleSettings.table.borderColor;
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th scope="col" data-col="day" tabindex="0" aria-sort="none" style="background:${currentStyleSettings.table.headerBg};color:${currentStyleSettings.table.headerColor};">Day <i class="fas fa-sort"></i></th>
+        <th scope="col" data-col="time" tabindex="0" aria-sort="none" style="background:${currentStyleSettings.table.headerBg};color:${currentStyleSettings.table.headerColor};">Time <i class="fas fa-sort"></i></th>
+        <th scope="col" data-col="className" tabindex="0" aria-sort="none" style="background:${currentStyleSettings.table.headerBg};color:${currentStyleSettings.table.headerColor};">Class Name <i class="fas fa-sort"></i></th>
+        <th scope="col" data-col="trainer" tabindex="0" aria-sort="none" style="background:${currentStyleSettings.table.headerBg};color:${currentStyleSettings.table.headerColor};">Trainer Name <i class="fas fa-sort"></i></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+  tableContainer.appendChild(table);
+  container.appendChild(tableContainer);
+
+  function renderTableRows(data) {
+    const tbody = table.querySelector("tbody");
+    tbody.innerHTML = "";
+    const { grouped, sortedKeys } = groupAndSortSchedule(data, currentGroupBy, currentSort.column, currentSort.asc);
+
+    sortedKeys.forEach(groupKey => {
+      const groupEntries = grouped[groupKey];
+      if (currentGroupBy) {
+        // Group header row with count
+        const groupRow = document.createElement("tr");
+        groupRow.className = "day-header-row";
+        const td = document.createElement("td");
+        td.colSpan = 4;
+        td.textContent = `${currentGroupBy.charAt(0).toUpperCase() + currentGroupBy.slice(1)}: ${groupKey} — ${groupEntries.length} class${groupEntries.length !== 1 ? "es" : ""}`;
+        groupRow.appendChild(td);
+        tbody.appendChild(groupRow);
+      }
+      groupEntries.forEach(({day, time, className, trainer}) => {
+        const tr = document.createElement("tr");
+        tr.dataset.day = day;
+        tr.dataset.className = className;
+        tr.dataset.trainer = trainer;
+        tr.innerHTML = `
+          <td>${day}</td>
+          <td>${time}</td>
+          <td>${className}</td>
+          <td>${trainer}</td>
+        `;
+        tr.style.cursor = "default";
+        tr.addEventListener("mouseenter", () => {
+          tr.style.backgroundColor = currentStyleSettings.table.rowHoverBg;
+        });
+        tr.addEventListener("mouseleave", () => {
+          tr.style.backgroundColor = "";
+        });
+        tbody.appendChild(tr);
+      });
+    });
+  }
+
+  function updateSortIcons() {
+    const headers = table.querySelectorAll("thead th");
+    headers.forEach(th => {
+      const col = th.dataset.col;
+      const icon = th.querySelector("i");
+      if (!icon) return;
+      if (col === currentSort.column) {
+        icon.className = currentSort.asc ? "fas fa-sort-up" : "fas fa-sort-down";
+        th.setAttribute("aria-sort", currentSort.asc ? "ascending" : "descending");
+      } else {
+        icon.className = "fas fa-sort";
+        th.setAttribute("aria-sort", "none");
+      }
+    });
+  }
+
+  // Initial render
+  applyFiltersAndSearch();
+  renderTableRows(filteredSchedule);
+  updateSortIcons();
+
+  // Event listeners for filters
+  daySelect.value = currentFilters.day;
+  classSelect.value = currentFilters.className;
+  trainerSelect.value = currentFilters.trainer;
+  searchInput.value = currentFilters.searchText;
+  groupSelect.value = currentGroupBy || "";
+  sortSelect.value = currentSort.column || "";
+  sortDirBtn.textContent = currentSort.asc ? "Asc" : "Desc";
+
+  function onFilterChange() {
+    currentFilters.day = daySelect.value;
+    currentFilters.className = classSelect.value;
+    currentFilters.trainer = trainerSelect.value;
+    currentFilters.searchText = searchInput.value.trim();
+    applyFiltersAndSearch();
+    renderTableRows(filteredSchedule);
+    infoDisplay.style.display = "none";
+  }
+  daySelect.addEventListener("change", onFilterChange);
+  classSelect.addEventListener("change", onFilterChange);
+  trainerSelect.addEventListener("change", onFilterChange);
+  searchInput.addEventListener("input", onFilterChange);
+
+  groupSelect.addEventListener("change", () => {
+    currentGroupBy = groupSelect.value || null;
+    renderTableRows(filteredSchedule);
+  });
+
+  sortSelect.addEventListener("change", () => {
+    currentSort.column = sortSelect.value || null;
+    renderTableRows(filteredSchedule);
+    updateSortIcons();
+  });
+
+  sortDirBtn.addEventListener("click", () => {
+    currentSort.asc = !currentSort.asc;
+    sortDirBtn.textContent = currentSort.asc ? "Asc" : "Desc";
+    renderTableRows(filteredSchedule);
+    updateSortIcons();
+  });
+
+  classCountBtn.addEventListener("click", () => {
+    const counts = {};
+    filteredSchedule.forEach(({className}) => {
+      counts[className] = (counts[className] || 0) + 1;
+    });
+    showInfoList("Class Type Counts", counts);
+  });
+
+  trainerCountBtn.addEventListener("click", () => {
+    const counts = {};
+    filteredSchedule.forEach(({trainer}) => {
+      counts[trainer] = (counts[trainer] || 0) + 1;
+    });
+    showInfoList("Trainer Counts", counts);
+  });
+
+  function showInfoList(title, counts) {
+    infoDisplay.innerHTML = `<strong>${title}:</strong>`;
+    const ul = document.createElement("ul");
+    Object.entries(counts).sort((a,b) => b[1] - a[1]).forEach(([key, val]) => {
+      const li = document.createElement("li");
+      li.textContent = `${key}: ${val}`;
+      ul.appendChild(li);
+    });
+    infoDisplay.appendChild(ul);
+    infoDisplay.style.display = "block";
+  }
+
+  copyBtn.addEventListener("click", () => {
+    let clipboardText = "Day\tTime\tClass Name\tTrainer Name\n";
+    filteredSchedule.forEach(({day, time, className, trainer}) => {
+      clipboardText += `${day}\t${time}\t${className}\t${trainer}\n`;
+    });
+    navigator.clipboard.writeText(clipboardText).then(() => {
+      copyBtn.textContent = "Copied!";
+      setTimeout(() => {
+        copyBtn.innerHTML = `<i class="fas fa-copy"></i> Copy Table to Clipboard`;
+      }, 2000);
+    }).catch(() => {
+      alert("Failed to copy to clipboard.");
+    });
+  });
+
+  downloadBtn.addEventListener("click", () => {
+    let csvContent = "Day,Time,Class Name,Trainer Name\n";
+    filteredSchedule.forEach(({day, time, className, trainer}) => {
+      const esc = str => `"${str.replace(/"/g, '""')}"`;
+      csvContent += [day, time, className, trainer].map(esc).join(",") + "\n";
+    });
+    const blob = new Blob([csvContent], {type: "text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "schedule.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  saveBtn.addEventListener("click", () => {
+    tableNameInput.value = "";
+    saveModal.classList.add("active");
+    tableNameInput.focus();
+  });
+}
+
+function renderKanbanView() {
+  const container = document.getElementById("tab-kanban");
+  container.innerHTML = "";
+  if (!filteredSchedule.length) {
+    container.innerHTML = "<p class='text-gray-500 text-center mt-6'>No data to display.</p>";
+    return;
+  }
+  // Group by day for Kanban columns
+  const dayOrder = {Monday:1,Tuesday:2,Wednesday:3,Thursday:4,Friday:5,Saturday:6,Sunday:7};
+  const grouped = {};
+  filteredSchedule.forEach(item => {
+    if (!grouped[item.day]) grouped[item.day] = [];
+    grouped[item.day].push(item);
+  });
+  const sortedDays = Object.keys(grouped).sort((a,b) => (dayOrder[a]||100) - (dayOrder[b]||100));
+
+  const board = document.createElement("div");
+  board.className = "kanban-board";
+
+  sortedDays.forEach(day => {
+    const col = document.createElement("div");
+    col.className = "kanban-column";
+    col.setAttribute("aria-label", `Kanban column for ${day}`);
+    const header = document.createElement("div");
+    header.className = "kanban-column-header";
+    header.textContent = `${day} (${grouped[day].length})`;
+    col.appendChild(header);
+
+    const cardsContainer = document.createElement("div");
+    cardsContainer.className = "kanban-cards";
+
+    grouped[day].forEach(({time, className, trainer}) => {
+      const card = document.createElement("div");
+      card.className = "kanban-card";
+      card.tabIndex = 0;
+      card.setAttribute("role", "article");
+      card.setAttribute("aria-label", `${className} at ${time} with trainer ${trainer}`);
+      card.innerHTML = `
+        <strong>${className}</strong>
+        <div><i class="fas fa-clock"></i> ${time}</div>
+        <div><i class="fas fa-user"></i> ${trainer}</div>
+      `;
+      cardsContainer.appendChild(card);
+    });
+
+    col.appendChild(cardsContainer);
+    board.appendChild(col);
+  });
+
+  container.appendChild(board);
+}
+
+function renderTimelineView() {
+  const container = document.getElementById("tab-timeline");
+  container.innerHTML = "";
+  if (!filteredSchedule.length) {
+    container.innerHTML = "<p class='text-gray-500 text-center mt-6'>No data to display.</p>";
+    return;
+  }
+  // Group by day, sort by time
+  const dayOrder = {Monday:1,Tuesday:2,Wednesday:3,Thursday:4,Friday:5,Saturday:6,Sunday:7};
+  const grouped = {};
+  filteredSchedule.forEach(item => {
+    if (!grouped[item.day]) grouped[item.day] = [];
+    grouped[item.day].push(item);
+  });
+  Object.keys(grouped).forEach(day => {
+    grouped[day].sort((a,b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  });
+  const sortedDays = Object.keys(grouped).sort((a,b) => (dayOrder[a]||100) - (dayOrder[b]||100));
+
+  const timelineContainer = document.createElement("div");
+  timelineContainer.className = "timeline-container";
+
+  const timeline = document.createElement("div");
+  timeline.className = "timeline";
+
+  sortedDays.forEach(day => {
+    const dayCol = document.createElement("div");
+    dayCol.className = "timeline-day";
+    dayCol.setAttribute("aria-label", `Timeline column for ${day}`);
+
+    const dayHeader = document.createElement("div");
+    dayHeader.className = "timeline-day-header";
+    dayHeader.textContent = day;
+    dayCol.appendChild(dayHeader);
+
+    grouped[day].forEach(({time, className, trainer}) => {
+      const event = document.createElement("div");
+      event.className = "timeline-event";
+      event.tabIndex = 0;
+      event.setAttribute("role", "article");
+      event.setAttribute("aria-label", `${className} at ${time} with trainer ${trainer}`);
+      event.innerHTML = `<strong>${time}</strong><br>${className}<br><em>${trainer}</em>`;
+      dayCol.appendChild(event);
+    });
+
+    timeline.appendChild(dayCol);
+  });
+
+  timelineContainer.appendChild(timeline);
+  container.appendChild(timelineContainer);
+}
+
+function renderCardView() {
+  const container = document.getElementById("tab-cards");
+  container.innerHTML = "";
+  if (!filteredSchedule.length) {
+    container.innerHTML = "<p class='text-gray-500 text-center mt-6'>No data to display.</p>";
+    return;
+  }
+  const cardGrid = document.createElement("div");
+  cardGrid.className = "card-view";
+
+  filteredSchedule.forEach(({day, time, className, trainer}) => {
+    const card = document.createElement("article");
+    card.className = "card";
+    card.tabIndex = 0;
+    card.setAttribute("aria-label", `${className} on ${day} at ${time} with trainer ${trainer}`);
+    card.innerHTML = `
+      <h3>${className}</h3>
+      <p><strong>Day:</strong> ${day}</p>
+      <p><strong>Time:</strong> ${time}</p>
+      <p><strong>Trainer:</strong> ${trainer}</p>
+    `;
+    cardGrid.appendChild(card);
+  });
+
+  container.appendChild(cardGrid);
+}
+
+function renderPivotView() {
+  const container = document.getElementById("tab-pivot");
+  container.innerHTML = "";
+  if (!filteredSchedule.length) {
+    container.innerHTML = "<p class='text-gray-500 text-center mt-6'>No data to display.</p>";
+    return;
+  }
+  // Pivot: Rows = Class Name, Columns = Day, Values = Count of classes
+  const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  const classes = [...new Set(filteredSchedule.map(s => s.className))].sort();
+
+  // Build pivot data
+  const pivotData = {};
+  classes.forEach(cls => {
+    pivotData[cls] = {};
+    days.forEach(day => {
+      pivotData[cls][day] = 0;
+    });
+  });
+  filteredSchedule.forEach(({day, className}) => {
+    if (pivotData[className] && pivotData[className][day] !== undefined) {
+      pivotData[className][day]++;
+    }
+  });
+
+  const tableContainer = document.createElement("div");
+  tableContainer.className = "pivot-table-container overflow-x-auto";
+
+  const table = document.createElement("table");
+  table.className = "pivot-table";
+  table.setAttribute("aria-label", "Pivot table of classes by day");
+
+  // Header row
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  const thClass = document.createElement("th");
+  thClass.textContent = "Class Name";
+  headerRow.appendChild(thClass);
+  days.forEach(day => {
+    const th = document.createElement("th");
+    th.textContent = day;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  // Body rows
+  const tbody = document.createElement("tbody");
+  classes.forEach(cls => {
+    const tr = document.createElement("tr");
+    const tdClass = document.createElement("td");
+    tdClass.textContent = cls;
+    tr.appendChild(tdClass);
+    days.forEach(day => {
+      const td = document.createElement("td");
+      td.textContent = pivotData[cls][day] || "";
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+
+  tableContainer.appendChild(table);
+  container.appendChild(tableContainer);
+}
+
+function renderTimeOfDayView() {
+  const container = document.getElementById("tab-timeofday");
+  container.innerHTML = "";
+  if (!filteredSchedule.length) {
+    container.innerHTML = "<p class='text-gray-500 text-center mt-6'>No data to display.</p>";
+    return;
+  }
+  // Group by time of day: Morning (5am-12pm), Afternoon (12pm-5pm), Evening (5pm-9pm), Night (9pm-5am)
+  const groups = {
+    Morning: [],
+    Afternoon: [],
+    Evening: [],
+    Night: []
+  };
+  filteredSchedule.forEach(({day, time, className, trainer}) => {
+    const mins = timeToMinutes(time);
+    if (mins >= 300 && mins < 720) groups.Morning.push({day, time, className, trainer});
+    else if (mins >= 720 && mins < 1020) groups.Afternoon.push({day, time, className, trainer});
+    else if (mins >= 1020 && mins < 1260) groups.Evening.push({day, time, className, trainer});
+    else groups.Night.push({day, time, className, trainer});
+  });
+
+  Object.entries(groups).forEach(([period, items]) => {
+    const groupDiv = document.createElement("section");
+    groupDiv.className = "timeofday-group";
+    const header = document.createElement("h3");
+    header.className = "timeofday-header";
+    header.textContent = `${period} (${items.length})`;
+    groupDiv.appendChild(header);
+
+    if (items.length === 0) {
+      const p = document.createElement("p");
+      p.textContent = "No classes in this time period.";
+      groupDiv.appendChild(p);
+    } else {
+      const ul = document.createElement("ul");
+      ul.className = "timeofday-list";
+      items.forEach(({day, time, className, trainer}) => {
+        const li = document.createElement("li");
+        li.textContent = `${day} - ${time} - ${className} (Trainer: ${trainer})`;
+        ul.appendChild(li);
+      });
+      groupDiv.appendChild(ul);
+    }
+    container.appendChild(groupDiv);
+  });
+}
+
+function renderSavedTables() {
+  const container = document.getElementById("tab-saved");
+  container.innerHTML = "";
+  const savedTables = JSON.parse(localStorage.getItem("savedSchedules") || "[]");
+  if (!savedTables.length) {
+    container.innerHTML = "<p class='text-gray-500 text-center mt-6'>No saved tables found.</p>";
+    return;
+  }
+  const list = document.createElement("ul");
+  list.className = "info-list";
+  savedTables.forEach((table, idx) => {
+    const li = document.createElement("li");
+    li.className = "flex justify-between items-center";
+    const infoDiv = document.createElement("div");
+    infoDiv.innerHTML = `<strong>${table.name}</strong> <small class="text-gray-500 ml-2">${new Date(table.timestamp).toLocaleString()}</small>`;
+    li.appendChild(infoDiv);
+
+    const btnsDiv = document.createElement("div");
+    btnsDiv.className = "flex gap-2";
+
+    const loadBtn = document.createElement("button");
+    loadBtn.className = "btn-info px-2 py-1 rounded text-white font-semibold bg-green-600 hover:bg-green-700";
+    loadBtn.textContent = "Load";
+    loadBtn.addEventListener("click", () => {
+      currentSchedule = table.data;
+      filteredSchedule = currentSchedule.slice();
+      currentFilters = { day: "", className: "", trainer: "", searchText: "" };
+      currentSort = { column: null, asc: true };
+      currentGroupBy = null;
+      switchTab(tabs[0]);
+      renderTableView();
+      alert(`Loaded saved table "${table.name}".`);
+    });
+    btnsDiv.appendChild(loadBtn);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "btn-info px-2 py-1 rounded text-white font-semibold bg-red-600 hover:bg-red-700";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.addEventListener("click", () => {
+      if (confirm(`Delete saved table "${table.name}"?`)) {
+        savedTables.splice(idx, 1);
+        localStorage.setItem("savedSchedules", JSON.stringify(savedTables));
+        renderSavedTables();
+      }
+    });
+    btnsDiv.appendChild(deleteBtn);
+
+    li.appendChild(btnsDiv);
+    list.appendChild(li);
+  });
+  container.appendChild(list);
+}
+
+// Modal save handlers
+cancelSaveBtn.addEventListener("click", () => {
+  saveModal.classList.remove("active");
+});
+saveTableBtn.addEventListener("click", () => {
+  const name = tableNameInput.value.trim();
+  if (!name) {
+    alert("Please enter a table name.");
+    tableNameInput.focus();
+    return;
+  }
+  const savedTables = JSON.parse(localStorage.getItem("savedSchedules") || "[]");
+  // Check for duplicate names
+  if (savedTables.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+    if (!confirm(`A saved table named "${name}" already exists. Overwrite?`)) {
+      return;
+    }
+    // Overwrite existing
+    const idx = savedTables.findIndex(t => t.name.toLowerCase() === name.toLowerCase());
+    savedTables.splice(idx, 1);
+  }
+  savedTables.push({
+    name,
+    timestamp: new Date().toISOString(),
+    data: filteredSchedule
+  });
+  localStorage.setItem("savedSchedules", JSON.stringify(savedTables));
+  alert(`Table "${name}" saved successfully.`);
+  saveModal.classList.remove("active");
+});
+
+// Accessibility: close modal on Escape
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && saveModal.classList.contains("active")) {
+    saveModal.classList.remove("active");
+  }
+});
+
+</script>
+</body>
+</html>
